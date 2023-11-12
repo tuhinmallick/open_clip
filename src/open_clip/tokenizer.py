@@ -138,9 +138,8 @@ class SimpleTokenizer(object):
         merges = merges[1:49152-256-2+1]
         merges = [tuple(merge.split()) for merge in merges]
         vocab = list(bytes_to_unicode().values())
-        vocab = vocab + [v+'</w>' for v in vocab]
-        for merge in merges:
-            vocab.append(''.join(merge))
+        vocab += [f'{v}</w>' for v in vocab]
+        vocab.extend(''.join(merge) for merge in merges)
         special_tokens = ['<start_of_text>', '<end_of_text>']
         if additional_special_tokens:
             special_tokens += additional_special_tokens
@@ -165,11 +164,11 @@ class SimpleTokenizer(object):
     def bpe(self, token):
         if token in self.cache:
             return self.cache[token]
-        word = tuple(token[:-1]) + ( token[-1] + '</w>',)
+        word = tuple(token[:-1]) + (f'{token[-1]}</w>', )
         pairs = get_pairs(word)
 
         if not pairs:
-            return token+'</w>'
+            return f'{token}</w>'
 
         while True:
             bigram = min(pairs, key = lambda pair: self.bpe_ranks.get(pair, float('inf')))
@@ -213,8 +212,11 @@ class SimpleTokenizer(object):
 
     def decode(self, tokens):
         text = ''.join([self.decoder[token] for token in tokens])
-        text = bytearray([self.byte_decoder[c] for c in text]).decode('utf-8', errors="replace").replace('</w>', ' ')
-        return text
+        return (
+            bytearray([self.byte_decoder[c] for c in text])
+            .decode('utf-8', errors="replace")
+            .replace('</w>', ' ')
+        )
 
     def __call__(self, texts: Union[str, List[str]], context_length: Optional[int] = None) -> torch.LongTensor:
         """ Returns the tokenized representation of given input string(s)
@@ -382,13 +384,13 @@ def syntax_mask_tokenize(
 
 def get_reduction_mask_fn(type: str):
     """ Choose strategy for dropping (masking) tokens to achieve target context length"""
-    assert type in ('simple', 'random', 'shuffle', 'syntax')
-    if type == 'simple':
-        return simple_mask_tokenize  # randomly select block [start:end]
-    elif type == 'random':
+    assert type in {'simple', 'random', 'shuffle', 'syntax'}
+    if type == 'random':
         return random_mask_tokenize  # randomly drop tokens (keep order)
     elif type == 'shuffle':
         return partial(random_mask_tokenize, shuffle=True)  # randomly drop tokens (shuffle order)
+    elif type == 'simple':
+        return simple_mask_tokenize  # randomly select block [start:end]
     elif type == 'syntax':
         return syntax_mask_tokenize  # randomly drop prioritized by syntax
 

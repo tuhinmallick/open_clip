@@ -23,8 +23,9 @@ class DownloadPretrainedTests(unittest.TestCase):
             'Content-Type': content_type,
             'Content-Length': str(len(data))
         })
-        raw = HTTPResponse(fp, preload_content=False, headers=headers, status=status_code)
-        return raw
+        return HTTPResponse(
+            fp, preload_content=False, headers=headers, status=status_code
+        )
 
     @patch('open_clip.pretrained.urllib')
     def test_download_pretrained_from_url_from_openaipublic(self, urllib):

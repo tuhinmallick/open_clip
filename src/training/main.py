@@ -55,13 +55,17 @@ def natural_key(string_):
 def get_latest_checkpoint(path: str, remote : bool):
     # as writen, this glob recurses, so can pick up checkpoints across multiple sub-folders
     if remote:
-        result = subprocess.run(["aws", "s3", "ls", path + "/"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(
+            ["aws", "s3", "ls", f"{path}/"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         print(result)
         if result.returncode == 1:
             return None
         checkpoints = [os.path.join(path, x.split(' ')[-1]) for x in result.stdout.decode().split('\n')[:-1]]
     else:
-        checkpoints = glob.glob(path + '**/*.pt', recursive=True)
+        checkpoints = glob.glob(f'{path}**/*.pt', recursive=True)
     if checkpoints:
         checkpoints = sorted(checkpoints, key=natural_key)
         return checkpoints[-1]
@@ -168,13 +172,11 @@ def main(args):
     # start the sync proces if remote-sync is not None
     remote_sync_process = None
     if is_master(args) and args.remote_sync is not None:
-        # first make sure it works
-        result = remote_sync(
-            os.path.join(args.logs, args.name), 
-            os.path.join(args.remote_sync, args.name), 
-            args.remote_sync_protocol
-        )
-        if result:
+        if result := remote_sync(
+            os.path.join(args.logs, args.name),
+            os.path.join(args.remote_sync, args.name),
+            args.remote_sync_protocol,
+        ):
             logging.info('remote sync successful.')
         else:
             logging.info('Error: remote sync failed. Exiting.')
@@ -297,7 +299,7 @@ def main(args):
             # this doesn't exist in older PyTorch, arg only added if enabled
             ddp_args['static_graph'] = True
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[device], **ddp_args)
-    
+
         if args.distill:
             dist_model = torch.nn.parallel.DistributedDataParallel(dist_model, device_ids=[device], **ddp_args)
 
@@ -476,12 +478,11 @@ def main(args):
     if remote_sync_process is not None:
         logging.info('Final remote sync.')
         remote_sync_process.terminate()
-        result = remote_sync(
-            os.path.join(args.logs, args.name), 
-            os.path.join(args.remote_sync, args.name), 
-            args.remote_sync_protocol
-        )
-        if result:
+        if result := remote_sync(
+            os.path.join(args.logs, args.name),
+            os.path.join(args.remote_sync, args.name),
+            args.remote_sync_protocol,
+        ):
             logging.info('Final remote sync successful.')
         else:
             logging.info('Final remote sync failed.')

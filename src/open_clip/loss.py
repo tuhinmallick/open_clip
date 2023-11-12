@@ -43,22 +43,20 @@ def gather_features(
                 gathered_text_features[rank] = text_features
                 all_image_features = torch.cat(gathered_image_features, dim=0)
                 all_text_features = torch.cat(gathered_text_features, dim=0)
+    elif gather_with_grad:
+        all_image_features = torch.cat(torch.distributed.nn.all_gather(image_features), dim=0)
+        all_text_features = torch.cat(torch.distributed.nn.all_gather(text_features), dim=0)
     else:
-        # We gather tensors from all gpus
-        if gather_with_grad:
-            all_image_features = torch.cat(torch.distributed.nn.all_gather(image_features), dim=0)
-            all_text_features = torch.cat(torch.distributed.nn.all_gather(text_features), dim=0)
-        else:
-            gathered_image_features = [torch.zeros_like(image_features) for _ in range(world_size)]
-            gathered_text_features = [torch.zeros_like(text_features) for _ in range(world_size)]
-            dist.all_gather(gathered_image_features, image_features)
-            dist.all_gather(gathered_text_features, text_features)
-            if not local_loss:
-                # ensure grads for local rank when all_* features don't have a gradient
-                gathered_image_features[rank] = image_features
-                gathered_text_features[rank] = text_features
-            all_image_features = torch.cat(gathered_image_features, dim=0)
-            all_text_features = torch.cat(gathered_text_features, dim=0)
+        gathered_image_features = [torch.zeros_like(image_features) for _ in range(world_size)]
+        gathered_text_features = [torch.zeros_like(text_features) for _ in range(world_size)]
+        dist.all_gather(gathered_image_features, image_features)
+        dist.all_gather(gathered_text_features, text_features)
+        if not local_loss:
+            # ensure grads for local rank when all_* features don't have a gradient
+            gathered_image_features[rank] = image_features
+            gathered_text_features[rank] = text_features
+        all_image_features = torch.cat(gathered_image_features, dim=0)
+        all_text_features = torch.cat(gathered_text_features, dim=0)
 
     return all_image_features, all_text_features
 
@@ -354,8 +352,7 @@ class SigLipLoss(nn.Module):
             image_features.shape[0],
             negative_only=negative_only,
         )
-        loss = -F.logsigmoid(labels * logits).sum() / image_features.shape[0]
-        return loss
+        return -F.logsigmoid(labels * logits).sum() / image_features.shape[0]
 
     def forward(self, image_features, text_features, logit_scale, logit_bias, output_dict=False):
         loss = self._loss(image_features, text_features, logit_scale, logit_bias)
@@ -367,7 +364,7 @@ class SigLipLoss(nn.Module):
             if self.bidir:
                 text_features_to_right = text_features_to_left = text_features
                 num_bidir, remainder = divmod(self.world_size - 1, 2)
-                for i in range(num_bidir):
+                for _ in range(num_bidir):
                     text_features_recv = neighbour_exchange_bidir_with_grad(
                         left_rank,
                         right_rank,
@@ -398,7 +395,7 @@ class SigLipLoss(nn.Module):
                     )
             else:
                 text_features_to_right = text_features
-                for i in range(self.world_size - 1):
+                for _ in range(self.world_size - 1):
                     text_features_from_left = neighbour_exchange_with_grad(
                         left_rank, right_rank, text_features_to_right)
 

@@ -38,9 +38,7 @@ if 'OPEN_CLIP_TEST_REG_MODELS' in os.environ:
         models_to_test = set(f.read().splitlines()).intersection(models_to_test)
     print(f"Selected models from {external_model_list}: {models_to_test}")
 
-# TODO: add "coca_ViT-B-32" onece https://github.com/pytorch/pytorch/issues/92073 gets fixed
-models_to_test = list(models_to_test)
-models_to_test.sort()
+models_to_test = sorted(models_to_test)
 models_to_test = [(model_name, False) for model_name in models_to_test]
 
 models_to_jit_test = {"ViT-B-32"}
