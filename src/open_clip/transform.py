@@ -101,10 +101,7 @@ class ResizeKeepRatio:
             random_aspect_prob=0.,
             random_aspect_range=(0.9, 1.11)
     ):
-        if isinstance(size, (list, tuple)):
-            self.size = tuple(size)
-        else:
-            self.size = (size, size)
+        self.size = tuple(size) if isinstance(size, (list, tuple)) else (size, size)
         self.interpolation = interpolation
         self.longest = float(longest)  # [0, 1] where 0 == shortest edge, 1 == longest
         self.random_scale_prob = random_scale_prob
@@ -249,10 +246,7 @@ class color_jitter(object):
         self.transf = ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation, hue=hue)
 
     def __call__(self, img):
-        if random.random() < self.p:
-            return self.transf(img)
-        else:
-            return img
+        return self.transf(img) if random.random() < self.p else img
 
 
 class gray_scale(object):
@@ -265,10 +259,7 @@ class gray_scale(object):
         self.transf = Grayscale(num_output_channels=3)
 
     def __call__(self, img):
-        if random.random() < self.p:
-            return self.transf(img)
-        else:
-            return img
+        return self.transf(img) if random.random() < self.p else img
 
 
 def image_transform(
@@ -306,8 +297,7 @@ def image_transform(
 
     if is_train:
         aug_cfg_dict = {k: v for k, v in asdict(aug_cfg).items() if v is not None}
-        use_timm = aug_cfg_dict.pop('use_timm', False)
-        if use_timm:
+        if use_timm := aug_cfg_dict.pop('use_timm', False):
             from timm.data import create_transform  # timm can still be optional
             if isinstance(image_size, (tuple, list)):
                 assert len(image_size) >= 2
@@ -372,14 +362,11 @@ def image_transform(
             assert resize_mode == 'shortest'
             if not isinstance(image_size, (tuple, list)):
                 image_size = (image_size, image_size)
-            if image_size[0] == image_size[1]:
-                # simple case, use torchvision built-in Resize w/ shortest edge mode (scalar size arg)
-                transforms = [
-                    Resize(image_size[0], interpolation=interpolation_mode)
-                ]
-            else:
-                # resize shortest edge to matching target dim for non-square target
-                transforms = [ResizeKeepRatio(image_size)]
+            transforms = (
+                [Resize(image_size[0], interpolation=interpolation_mode)]
+                if image_size[0] == image_size[1]
+                else [ResizeKeepRatio(image_size)]
+            )
             transforms += [CenterCrop(image_size)]
 
         transforms.extend([

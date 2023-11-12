@@ -23,9 +23,7 @@ def freeze_batch_norm_2d(module, module_match={}, name=''):
     Inspired by https://github.com/pytorch/pytorch/blob/a5895f85be0f10212791145bfedc0261d364f103/torch/nn/modules/batchnorm.py#L762
     """
     res = module
-    is_match = True
-    if module_match:
-        is_match = name in module_match
+    is_match = name in module_match if module_match else True
     if is_match and isinstance(module, (nn.modules.batchnorm.BatchNorm2d, nn.modules.batchnorm.SyncBatchNorm)):
         res = FrozenBatchNorm2d(module.num_features)
         res.num_features = module.num_features
@@ -48,9 +46,8 @@ def freeze_batch_norm_2d(module, module_match={}, name=''):
 # From PyTorch internals
 def _ntuple(n):
     def parse(x):
-        if isinstance(x, collections.abc.Iterable):
-            return x
-        return tuple(repeat(x, n))
+        return x if isinstance(x, collections.abc.Iterable) else tuple(repeat(x, n))
+
     return parse
 
 
@@ -64,7 +61,7 @@ to_ntuple = lambda n, x: _ntuple(n)(x)
 # TODO: add int8 support for other linear layers including attn and convnets
 def replace_linear(model, linear_replacement, include_modules=['c_fc', 'c_proj'], copy_weights=True):
     for name, module in model.named_children():
-        if len(list(module.children())) > 0:
+        if list(module.children()):
             replace_linear(module, linear_replacement, include_modules, copy_weights)
 
         if isinstance(module, torch.nn.Linear) and name in include_modules:

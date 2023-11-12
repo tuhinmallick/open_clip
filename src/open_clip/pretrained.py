@@ -441,12 +441,8 @@ def list_pretrained(as_str: bool = False):
 
 def list_pretrained_models_by_tag(tag: str):
     """ return all models having the specified pretrain tag """
-    models = []
     tag = _clean_tag(tag)
-    for k in _PRETRAINED.keys():
-        if tag in _PRETRAINED[k]:
-            models.append(k)
-    return models
+    return [k for k in _PRETRAINED.keys() if tag in _PRETRAINED[k]]
 
 
 def list_pretrained_tags_by_model(model: str):
@@ -458,9 +454,7 @@ def list_pretrained_tags_by_model(model: str):
 
 
 def is_pretrained_cfg(model: str, tag: str):
-    if model not in _PRETRAINED:
-        return False
-    return _clean_tag(tag) in _PRETRAINED[model]
+    return _clean_tag(tag) in _PRETRAINED[model] if model in _PRETRAINED else False
 
 
 def get_pretrained_cfg(model: str, tag: str):
@@ -497,14 +491,13 @@ def download_pretrained_from_url(
         raise RuntimeError(f"{download_target} exists and is not a regular file")
 
     if os.path.isfile(download_target):
-        if expected_sha256:
-            if hashlib.sha256(open(download_target, "rb").read()).hexdigest().startswith(expected_sha256):
-                return download_target
-            else:
-                warnings.warn(f"{download_target} exists, but the SHA256 checksum does not match; re-downloading the file")
-        else:
+        if not expected_sha256:
             return download_target
 
+        if hashlib.sha256(open(download_target, "rb").read()).hexdigest().startswith(expected_sha256):
+            return download_target
+        else:
+            warnings.warn(f"{download_target} exists, but the SHA256 checksum does not match; re-downloading the file")
     with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
         with tqdm(total=int(source.headers.get("Content-Length")), ncols=80, unit='iB', unit_scale=True) as loop:
             while True:
@@ -516,7 +509,9 @@ def download_pretrained_from_url(
                 loop.update(len(buffer))
 
     if expected_sha256 and not hashlib.sha256(open(download_target, "rb").read()).hexdigest().startswith(expected_sha256):
-        raise RuntimeError(f"Model has been downloaded but the SHA256 checksum does not not match")
+        raise RuntimeError(
+            "Model has been downloaded but the SHA256 checksum does not not match"
+        )
 
     return download_target
 
@@ -536,8 +531,9 @@ def download_pretrained_from_hf(
         cache_dir: Union[str, None] = None,
 ):
     has_hf_hub(True)
-    cached_file = hf_hub_download(model_id, filename, revision=revision, cache_dir=cache_dir)
-    return cached_file
+    return hf_hub_download(
+        model_id, filename, revision=revision, cache_dir=cache_dir
+    )
 
 
 def download_pretrained(

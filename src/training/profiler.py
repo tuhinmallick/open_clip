@@ -123,7 +123,7 @@ def profile_torch(model, text_input_size, image_input_size, batch_size=1, force_
 
 
 def count_params(model):
-    return sum([m.numel() for m in model.parameters()])
+    return sum(m.numel() for m in model.parameters())
 
 def profile_model(model_name, batch_size=1, profiler='torch'):
     assert profiler in ['torch', 'fvcore'], 'Only torch and fvcore profilers are supported'
@@ -134,21 +134,17 @@ def profile_model(model_name, batch_size=1, profiler='torch'):
     if torch.cuda.is_available():
         model = model.cuda()
 
-    if isinstance(model.visual.image_size, (tuple, list)):
-        image_input_size = (3,) + tuple(model.visual.image_size[-2:])
-    else:
-        image_input_size = (3, model.visual.image_size, model.visual.image_size)
-
     text_input_size = (77,)
     if hasattr(model, 'context_length') and model.context_length:
         text_input_size = (model.context_length,)
 
-    results = {}
-    results['model'] = model_name
-    results['image_size'] = image_input_size[1]
-
-    model_cfg = open_clip.get_model_config(model_name)
-    if model_cfg:
+    image_input_size = (
+        (3,) + tuple(model.visual.image_size[-2:])
+        if isinstance(model.visual.image_size, (tuple, list))
+        else (3, model.visual.image_size, model.visual.image_size)
+    )
+    results = {'model': model_name, 'image_size': image_input_size[1]}
+    if model_cfg := open_clip.get_model_config(model_name):
         vision_cfg = open_clip.CLIPVisionCfg(**model_cfg['vision_cfg'])
         text_cfg = open_clip.CLIPTextCfg(**model_cfg['text_cfg'])
         results['image_width'] = int(vision_cfg.width)
@@ -179,10 +175,10 @@ def profile_model(model_name, batch_size=1, profiler='torch'):
 
                 results['gmacs'] = round(macs / 1e9, 2)
                 results['macts'] = round(acts / 1e6, 2)
-                
+
                 results['image_gmacs'] = round(image_macs / 1e9, 2)
                 results['image_macts'] = round(image_acts / 1e6, 2)
-                
+
                 results['text_gmacs'] = round(text_macs / 1e9, 2)
                 results['text_macts'] = round(text_acts / 1e6, 2)
             elif profiler == 'torch':

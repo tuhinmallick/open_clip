@@ -63,7 +63,7 @@ def load_big_vision_weights(model: CustomTextCLIP, checkpoint_path: str):
         mha_sub, b_sub, ln1_sub = (0, 0, 1)
         for i, block in enumerate(module.blocks.children()):
             block_prefix = f'{prefix}Transformer/encoderblock_{i}/'
-            mha_prefix = block_prefix + f'MultiHeadDotProductAttention_{mha_sub}/'
+            mha_prefix = f'{block_prefix}MultiHeadDotProductAttention_{mha_sub}/'
             block.norm1.weight.copy_(_n2p(w[f'{block_prefix}LayerNorm_0/scale']))
             block.norm1.bias.copy_(_n2p(w[f'{block_prefix}LayerNorm_0/bias']))
             block.attn.qkv.weight.copy_(torch.cat([
@@ -83,7 +83,7 @@ def load_big_vision_weights(model: CustomTextCLIP, checkpoint_path: str):
 
         if module.attn_pool is not None:
             block_prefix = f'{prefix}MAPHead_0/'
-            mha_prefix = block_prefix + f'MultiHeadDotProductAttention_0/'
+            mha_prefix = f'{block_prefix}MultiHeadDotProductAttention_0/'
             module.attn_pool.latent.copy_(_n2p(w[f'{block_prefix}probe'], t=False))
             module.attn_pool.q.weight.copy_(_n2p(w[f'{mha_prefix}query/kernel'], t=False).flatten(1).T)
             module.attn_pool.q.bias.copy_(_n2p(w[f'{mha_prefix}query/bias'], t=False).reshape(-1))
@@ -102,7 +102,7 @@ def load_big_vision_weights(model: CustomTextCLIP, checkpoint_path: str):
     def _convert_openclip_transformer(module: Transformer, prefix):
         for i, block in enumerate(module.resblocks.children()):
             block_prefix = f'{prefix}encoderblock_{i}/'
-            mha_prefix = block_prefix + f'MultiHeadDotProductAttention_0/'
+            mha_prefix = f'{block_prefix}MultiHeadDotProductAttention_0/'
             block.ln_1.weight.copy_(_n2p(w[f'{block_prefix}LayerNorm_0/scale']))
             block.ln_1.bias.copy_(_n2p(w[f'{block_prefix}LayerNorm_0/bias']))
             block.attn.in_proj_weight.copy_(torch.cat([
@@ -122,7 +122,7 @@ def load_big_vision_weights(model: CustomTextCLIP, checkpoint_path: str):
         module.token_embedding.weight.copy_(_n2p(w[f'{prefix}Embed_0/embedding'], t=False))
         pos_embed_w = _n2p(w[f'{prefix}pos_embedding'], t=False).squeeze(0)
         module.positional_embedding.copy_(pos_embed_w)
-        _convert_openclip_transformer(module.transformer, prefix=prefix + 'Encoder_0/')
+        _convert_openclip_transformer(module.transformer, prefix=f'{prefix}Encoder_0/')
         module.ln_final.weight.copy_(_n2p(w[f'{prefix}Encoder_0/encoder_norm/scale']))
         module.ln_final.bias.copy_(_n2p(w[f'{prefix}Encoder_0/encoder_norm/bias']))
         module.text_projection.weight.copy_(_n2p(w[f'{prefix}head/kernel']))

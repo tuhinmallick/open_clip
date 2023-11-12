@@ -22,7 +22,7 @@ from .tokenizer import HFTokenizer, SimpleTokenizer, DEFAULT_CONTEXT_LENGTH
 
 
 HF_HUB_PREFIX = 'hf-hub:'
-_MODEL_CONFIG_PATHS = [Path(__file__).parent / f"model_configs/"]
+_MODEL_CONFIG_PATHS = [Path(__file__).parent / "model_configs/"]
 _MODEL_CONFIGS = {}  # directory (model_name: config) of model architecture configs
 
 
@@ -48,7 +48,9 @@ def _rescan_model_configs():
             if all(a in model_cfg for a in ('embed_dim', 'vision_cfg', 'text_cfg')):
                 _MODEL_CONFIGS[cf.stem] = model_cfg
 
-    _MODEL_CONFIGS = {k: v for k, v in sorted(_MODEL_CONFIGS.items(), key=lambda x: _natural_key(x[0]))}
+    _MODEL_CONFIGS = dict(
+        sorted(_MODEL_CONFIGS.items(), key=lambda x: _natural_key(x[0]))
+    )
 
 
 _rescan_model_configs()  # initial populate of model config registry
@@ -91,12 +93,11 @@ def get_tokenizer(
         try:
             config = _get_hf_config(model_name)['model_cfg']
         except Exception:
-            tokenizer = HFTokenizer(
+            return HFTokenizer(
                 model_name,
                 context_length=context_length or DEFAULT_CONTEXT_LENGTH,
                 **kwargs,
             )
-            return tokenizer
     else:
         config = get_model_config(model_name)
         assert config is not None, f"No valid model config found for {model_name}."
@@ -110,19 +111,18 @@ def get_tokenizer(
     if context_length is None:
         context_length = text_config.get('context_length', DEFAULT_CONTEXT_LENGTH)
 
-    if 'hf_tokenizer_name' in text_config:
-        tokenizer = HFTokenizer(
+    return (
+        HFTokenizer(
             text_config['hf_tokenizer_name'],
             context_length=context_length,
             **tokenizer_kwargs,
         )
-    else:
-        tokenizer = SimpleTokenizer(
+        if 'hf_tokenizer_name' in text_config
+        else SimpleTokenizer(
             context_length=context_length,
             **tokenizer_kwargs,
         )
-
-    return tokenizer
+    )
 
 
 def load_state_dict(checkpoint_path: str, map_location='cpu'):
@@ -159,8 +159,7 @@ def load_checkpoint(model, checkpoint_path, strict=True):
         del state_dict[position_id_key]
     resize_pos_embed(state_dict, model)
     resize_text_pos_embed(state_dict, model)
-    incompatible_keys = model.load_state_dict(state_dict, strict=strict)
-    return incompatible_keys
+    return model.load_state_dict(state_dict, strict=strict)
 
 
 def create_model(
@@ -252,7 +251,7 @@ def create_model(
         else:
             model = CLIP(**model_cfg, cast_dtype=cast_dtype)
 
-        if precision in ("fp16", "bf16"):
+        if precision in {"fp16", "bf16"}:
             dtype = torch.float16 if 'fp16' in precision else torch.bfloat16
             # manual mixed precision that matches original OpenAI behaviour
             if is_timm_model:
@@ -270,7 +269,7 @@ def create_model(
             else:
                 model.to(device=device)
                 convert_weights_to_lp(model, dtype=dtype)
-        elif precision in ("pure_fp16", "pure_bf16"):
+        elif precision in {"pure_fp16", "pure_bf16"}:
             dtype = torch.float16 if 'fp16' in precision else torch.bfloat16
             model.to(device=device, dtype=dtype)
         else:

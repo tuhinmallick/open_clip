@@ -42,15 +42,17 @@ def forward_model(model, model_name, preprocess_val, image_batch, text_batch):
             x_im = torch.stack([preprocess_val(im) for im in x_im])
             x_txt = tokenizer(x_txt)
         y.append(model(x_im, x_txt))
-    if type(y[0]) == dict:
-        out = {}
-        for key in y[0].keys():
-            out[key] = torch.stack([batch_out[key] for batch_out in y])
-    else:
-        out = []
-        for i in range(len(y[0])):
-            out.append(torch.stack([batch_out[i] for batch_out in y]))
-    return out
+    return (
+        {
+            key: torch.stack([batch_out[key] for batch_out in y])
+            for key in y[0].keys()
+        }
+        if type(y[0]) == dict
+        else [
+            torch.stack([batch_out[i] for batch_out in y])
+            for i in range(len(y[0]))
+        ]
+    )
 
 def random_image_batch(batch_size, size):
     h, w = size
@@ -175,13 +177,18 @@ def create_test_data(
         batch_size = 1,
         overwrite = False
 ):
-    models = list(set(models).difference({
-            # not available with timm
-            # see https://github.com/mlfoundations/open_clip/issues/219
-            'timm-convnext_xlarge',
-            'timm-vit_medium_patch16_gap_256'
-    }).intersection(open_clip.list_models()))
-    models.sort()
+    models = sorted(
+        set(models)
+        .difference(
+            {
+                # not available with timm
+                # see https://github.com/mlfoundations/open_clip/issues/219
+                'timm-convnext_xlarge',
+                'timm-vit_medium_patch16_gap_256',
+            }
+        )
+        .intersection(open_clip.list_models())
+    )
     print(f"generating test data for:\n{models}")
     for model_name in models:
         print(model_name)
@@ -287,7 +294,7 @@ def main(args):
         except AssertionError as e:
             _sytem_assert(f'git checkout -f {current_branch}')
             if has_stash:
-                os.system(f'git stash pop')
+                os.system('git stash pop')
             raise e
     open_clip = importlib.import_module('open_clip')
     models = open_clip.list_models() if args.all else args.model + model_list
@@ -308,7 +315,7 @@ def main(args):
                 os.rename(test_dir, test_dir_ref)
             _sytem_assert(f'git checkout {current_branch}')
             if has_stash:
-                os.system(f'git stash pop')
+                os.system('git stash pop')
             os.rename(test_dir_ref, test_dir)
     if args.save_model_list is not None:
         print(f"Saving model list as {args.save_model_list}")

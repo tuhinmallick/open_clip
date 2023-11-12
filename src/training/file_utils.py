@@ -13,8 +13,8 @@ def remote_sync_s3(local_dir, remote_dir):
     if result.returncode != 0:
         logging.error(f"Error: Failed to sync with S3 bucket {result.stderr.decode('utf-8')}")
         return False
-        
-    logging.info(f"Successfully synced with S3 bucket")
+
+    logging.info("Successfully synced with S3 bucket")
     return True
 
 def remote_sync_fsspec(local_dir, remote_dir):
@@ -57,8 +57,10 @@ def keep_running_remote_sync(sync_every, local_dir, remote_dir, protocol):
         remote_sync(local_dir, remote_dir, protocol)
 
 def start_sync_process(sync_every, local_dir, remote_dir, protocol):
-    p = multiprocessing.Process(target=keep_running_remote_sync, args=(sync_every, local_dir, remote_dir, protocol))
-    return p
+    return multiprocessing.Process(
+        target=keep_running_remote_sync,
+        args=(sync_every, local_dir, remote_dir, protocol),
+    )
 
 # Note: we are not currently using this save function.
 def pt_save(pt_obj, file_path):

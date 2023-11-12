@@ -12,10 +12,10 @@ def batched(iterable, n):
     """
     it = iter(iterable)
     while True:
-        batch = list(islice(it, n))
-        if not batch:
+        if batch := list(islice(it, n)):
+            yield batch
+        else:
             break
-        yield batch
 
 
 def build_zero_shot_classifier(

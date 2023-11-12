@@ -39,7 +39,7 @@ def test_inference_simple(
 
     current_dir = os.path.dirname(os.path.realpath(__file__))
 
-    image = preprocess(Image.open(current_dir + "/../docs/CLIP.png")).unsqueeze(0)
+    image = preprocess(Image.open(f"{current_dir}/../docs/CLIP.png")).unsqueeze(0)
     text = tokenizer(["a diagram", "a dog", "a cat"])
 
     with torch.no_grad():

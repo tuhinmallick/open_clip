@@ -109,11 +109,7 @@ class Attention(nn.Module):
 
         # keeping in_proj in this form (instead of nn.Linear) to match weight scheme of original
         self.in_proj_weight = nn.Parameter(torch.randn((dim * 3, dim)) * self.scale)
-        if qkv_bias:
-            self.in_proj_bias = nn.Parameter(torch.zeros(dim * 3))
-        else:
-            self.in_proj_bias = None
-
+        self.in_proj_bias = nn.Parameter(torch.zeros(dim * 3)) if qkv_bias else None
         if self.scaled_cosine:
             self.logit_scale = nn.Parameter(torch.log(10 * torch.ones((num_heads, 1, 1))))
         else:
@@ -351,7 +347,7 @@ class VisionTransformer(nn.Module):
             output_tokens: bool = False,
     ):
         super().__init__()
-        assert pool_type in ('tok', 'avg', 'none')
+        assert pool_type in {'tok', 'avg', 'none'}
         self.output_tokens = output_tokens
         image_height, image_width = self.image_size = to_2tuple(image_size)
         patch_height, patch_width = self.patch_size = to_2tuple(patch_size)
@@ -370,7 +366,7 @@ class VisionTransformer(nn.Module):
         elif pos_embed_type == 'sin_cos_2d':
             # fixed sin-cos embedding
             assert self.grid_size[0] == self.grid_size[1],\
-                'currently sin cos 2d pos embedding only supports square input'
+                    'currently sin cos 2d pos embedding only supports square input'
             self.positional_embedding = nn.Parameter(
                 torch.zeros(self.grid_size[0] * self.grid_size[1] + 1, width), requires_grad=False)
             pos_embed_type = get_2d_sincos_pos_embed(width, self.grid_size[0], cls_token=True)
@@ -396,7 +392,7 @@ class VisionTransformer(nn.Module):
             if isinstance(attentional_pool, str):
                 self.attn_pool_type = attentional_pool
                 self.pool_type = 'none'
-                if attentional_pool in ('parallel', 'cascade'):
+                if attentional_pool in {'parallel', 'cascade'}:
                     self.attn_pool = AttentionalPooler(
                         output_dim,
                         width,
@@ -541,21 +537,18 @@ class VisionTransformer(nn.Module):
         if self.proj is not None:
             pooled = pooled @ self.proj
 
-        if self.output_tokens:
-            return pooled, tokens
-        
-        return pooled
+        return (pooled, tokens) if self.output_tokens else pooled
 
 
 def text_global_pool(x, text: Optional[torch.Tensor] = None, pool_type: str = 'argmax'):
-    if pool_type == 'first':
-        pooled, tokens = x[:, 0], x[:, 1:]
-    elif pool_type == 'last':
-        pooled, tokens = x[:, -1], x[:, :-1]
-    elif pool_type == 'argmax':
+    if pool_type == 'argmax':
         # take features from the eot embedding (eot_token is the highest number in each sequence)
         assert text is not None
         pooled, tokens = x[torch.arange(x.shape[0]), text.argmax(dim=-1)], x
+    elif pool_type == 'first':
+        pooled, tokens = x[:, 0], x[:, 1:]
+    elif pool_type == 'last':
+        pooled, tokens = x[:, -1], x[:, :-1]
     else:
         pooled = tokens = x
 
@@ -585,7 +578,7 @@ class TextTransformer(nn.Module):
             output_tokens: bool = False,
     ):
         super().__init__()
-        assert pool_type in ('first', 'last', 'argmax', 'none')
+        assert pool_type in {'first', 'last', 'argmax', 'none'}
         self.output_tokens = output_tokens
         self.num_pos = self.context_length = context_length
         self.vocab_size = vocab_size
@@ -702,10 +695,7 @@ class TextTransformer(nn.Module):
             else:
                 pooled = pooled @ self.text_projection
 
-        if self.output_tokens:
-            return pooled, tokens
-
-        return pooled
+        return (pooled, tokens) if self.output_tokens else pooled
 
 
 class MultimodalTransformer(Transformer):

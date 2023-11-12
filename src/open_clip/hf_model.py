@@ -111,9 +111,6 @@ class HFTextEncoder(nn.Module):
         self.output_tokens = output_tokens
         self.output_dim = output_dim
 
-        # TODO: find better way to get this information
-        uses_transformer_pooler = (pooler_type == "cls_pooler")
-
         if transformers is None:
             raise RuntimeError("Please `pip install transformers` to use pre-trained HuggingFace models")
         if config is None:
@@ -125,6 +122,9 @@ class HFTextEncoder(nn.Module):
                 self.transformer = create_func(model_args)
                 self.transformer = self.transformer.encoder
             else:
+                # TODO: find better way to get this information
+                uses_transformer_pooler = (pooler_type == "cls_pooler")
+
                 self.transformer = create_func(model_args, add_pooling_layer=uses_transformer_pooler)
         else:
             self.config = config
@@ -163,10 +163,8 @@ class HFTextEncoder(nn.Module):
             if type(self.pooler) == ClsPooler 
             else out.last_hidden_state
         )
-        
-        if self.output_tokens:
-            return projected, tokens
-        return projected
+
+        return (projected, tokens) if self.output_tokens else projected
 
     def lock(self, unlocked_layers: int = 0, freeze_layer_norm: bool = True):
         if not unlocked_layers:  # full freezing

@@ -133,9 +133,7 @@ class ModifiedResNet(nn.Module):
         layers = [Bottleneck(self._inplanes, planes, stride)]
 
         self._inplanes = planes * Bottleneck.expansion
-        for _ in range(1, blocks):
-            layers.append(Bottleneck(self._inplanes, planes))
-
+        layers.extend(Bottleneck(self._inplanes, planes) for _ in range(1, blocks))
         return nn.Sequential(*layers)
 
     def init_parameters(self):

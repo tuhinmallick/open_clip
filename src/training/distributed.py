@@ -26,10 +26,9 @@ def is_using_horovod():
     # Differentiating between horovod and DDP use via SLURM may not be possible, so horovod arg still required...
     ompi_vars = ["OMPI_COMM_WORLD_RANK", "OMPI_COMM_WORLD_SIZE"]
     pmi_vars = ["PMI_RANK", "PMI_SIZE"]
-    if all([var in os.environ for var in ompi_vars]) or all([var in os.environ for var in pmi_vars]):
-        return True
-    else:
-        return False
+    return all(var in os.environ for var in ompi_vars) or all(
+        var in os.environ for var in pmi_vars
+    )
 
 
 def is_using_distributed():
@@ -41,22 +40,45 @@ def is_using_distributed():
 
 
 def world_info_from_env():
-    local_rank = 0
-    for v in ('LOCAL_RANK', 'MPI_LOCALRANKID', 'SLURM_LOCALID', 'OMPI_COMM_WORLD_LOCAL_RANK'):
-        if v in os.environ:
-            local_rank = int(os.environ[v])
-            break
-    global_rank = 0
-    for v in ('RANK', 'PMI_RANK', 'SLURM_PROCID', 'OMPI_COMM_WORLD_RANK'):
-        if v in os.environ:
-            global_rank = int(os.environ[v])
-            break
-    world_size = 1
-    for v in ('WORLD_SIZE', 'PMI_SIZE', 'SLURM_NTASKS', 'OMPI_COMM_WORLD_SIZE'):
-        if v in os.environ:
-            world_size = int(os.environ[v])
-            break
-
+    local_rank = next(
+        (
+            int(os.environ[v])
+            for v in (
+                'LOCAL_RANK',
+                'MPI_LOCALRANKID',
+                'SLURM_LOCALID',
+                'OMPI_COMM_WORLD_LOCAL_RANK',
+            )
+            if v in os.environ
+        ),
+        0,
+    )
+    global_rank = next(
+        (
+            int(os.environ[v])
+            for v in (
+                'RANK',
+                'PMI_RANK',
+                'SLURM_PROCID',
+                'OMPI_COMM_WORLD_RANK',
+            )
+            if v in os.environ
+        ),
+        0,
+    )
+    world_size = next(
+        (
+            int(os.environ[v])
+            for v in (
+                'WORLD_SIZE',
+                'PMI_SIZE',
+                'SLURM_NTASKS',
+                'OMPI_COMM_WORLD_SIZE',
+            )
+            if v in os.environ
+        ),
+        1,
+    )
     return local_rank, global_rank, world_size
 
 
@@ -115,23 +137,16 @@ def init_distributed_device(args):
 
 
 def broadcast_object(args, obj, src=0):
-    # broadcast a pickle-able python object from rank-0 to all ranks
     if args.horovod:
         return hvd.broadcast_object(obj, root_rank=src)
-    else:
-        if args.rank == src:
-            objects = [obj]
-        else:
-            objects = [None]
-        dist.broadcast_object_list(objects, src=src)
-        return objects[0]
+    objects = [obj] if args.rank == src else [None]
+    dist.broadcast_object_list(objects, src=src)
+    return objects[0]
 
 
 def all_gather_object(args, obj, dst=0):
-    # gather a pickle-able python object across all ranks
     if args.horovod:
         return hvd.allgather_object(obj)
-    else:
-        objects = [None for _ in range(args.world_size)]
-        dist.all_gather_object(objects, obj)
-        return objects
+    objects = [None for _ in range(args.world_size)]
+    dist.all_gather_object(objects, obj)
+    return objects
